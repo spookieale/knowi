@@ -10,5 +10,20 @@
         <string>Poppins-Bold.ttf</string>
         <string>Poppins-SemiBold.ttf</string>
     </array>
+    <!-- Add these entries to your Info.plist -->
+    <key>NSCameraUsageDescription</key>
+    <string>Esta aplicación requiere acceso a la cámara para reconocer objetos del mundo real en AR.</string>
+
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>armv7</string>
+        <string>arkit</string>
+    </array>
+    <key>NSMotionUsageDescription</key>
+    <string>Necesitamos acceso al movimiento para los desafíos interactivos de matemáticas</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Esta aplicación requiere acceso al micrófono para reconocer tu voz y procesar comandos de voz.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Esta aplicación utiliza el reconocimiento de voz para convertir tus comandos en texto y resolver desafíos de programación.</string>
 </dict>
 </plist>

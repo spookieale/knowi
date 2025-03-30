@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreMotion
 
 // Model for user profile data
 struct UserProfile: Codable {
@@ -133,7 +134,7 @@ class UserDataManager: ObservableObject {
             iconName: "cube",
             isCompleted: false,
             completionPercentage: 0.0,
-            destination: nil  // Will be implemented later
+            destination: AnyView(ARPuzzleGameView())
         )
         
         // Add all quests to available quests
@@ -221,6 +222,70 @@ class UserDataManager: ObservableObject {
         return availableQuests.first(where: { $0.title == questTitle })?.isCompleted ?? false
     }
     
+    func addMotionMathChallenge() {
+            // Check if the challenge already exists
+            if availableQuests.contains(where: { $0.title == "Desafío Matemático con Movimiento" }) {
+                return
+            }
+            
+            let motionMathQuest = Quest(
+                title: "Desafío Matemático con Movimiento",
+                description: "Resuelve problemas matemáticos inclinando tu dispositivo en diferentes direcciones",
+                xpReward: 180,
+                duration: 15,
+                difficulty: .intermediate,
+                learningStyles: ["kinesthetic", "visual"],
+                iconName: "function",
+                isCompleted: false,
+                completionPercentage: 0.0,
+                destination: AnyView(MotionMathChallengeView()),
+                isRecommended: true,
+                recommendationReason: "Perfecto para tu estilo de aprendizaje kinestésico"
+            )
+            
+            // Add to available quests
+            availableQuests.append(motionMathQuest)
+            
+            // If user has kinesthetic or visual learning style, make it the suggested quest
+            if (userProfile.learningStyles.contains("kinesthetic") || userProfile.learningStyles.contains("visual")),
+               !isQuestCompleted("Desafío Matemático con Movimiento") {
+                var suggestedCopy = motionMathQuest
+                suggestedCopy.isRecommended = true
+                
+                // Set recommendation reason based on learning style
+                if userProfile.learningStyles.contains("kinesthetic") {
+                    suggestedCopy.recommendationReason = "Perfecto para tu estilo de aprendizaje kinestésico"
+                } else {
+                    suggestedCopy.recommendationReason = "Perfecto para tu estilo de aprendizaje visual"
+                }
+                
+                suggestedQuest = suggestedCopy
+            }
+            
+            // Save changes
+            saveUserData()
+        }
+    
+    func addVoiceCommandsChallengeQuest() {
+            if availableQuests.contains(where: { $0.title == "Desafío de Comandos de Voz" }) {
+                return
+            }
+            let voiceQuest = Quest(
+                title: "Desafío de Comandos de Voz",
+                description: "Resuelve desafíos de programación hablando comandos en español.",
+                xpReward: 180,
+                duration: 15,
+                difficulty: .intermediate,
+                learningStyles: ["auditory", "kinesthetic"],
+                iconName: "waveform", // SF Symbol representing audio/waveform
+                isCompleted: false,
+                completionPercentage: 0.0,
+                destination: AnyView(VoiceCommandsChallengeView())
+            )
+            availableQuests.append(voiceQuest)
+            saveUserData()
+        }
+    
     // Add dictation lesson quest
     func addDictationLesson() {
         // Check if the lesson already exists
@@ -256,6 +321,27 @@ class UserDataManager: ObservableObject {
         // Save changes
         saveUserData()
     }
+    
+    func addAnimatedTextAdventureQuest() {
+            // Check if the quest is already added.
+            if availableQuests.contains(where: { $0.title == "Aventura Textual Histórica" }) {
+                return
+            }
+            let textAdventureQuest = Quest(
+                title: "Aventura Textual Histórica",
+                description: "Embárcate en una aventura interactiva y descubre secretos del antiguo Egipto mediante una historia animada.",
+                xpReward: 150,
+                duration: 20,
+                difficulty: .beginner,
+                learningStyles: ["reading", "visual"],
+                iconName: "textformat.size", // Use a suitable SF Symbol
+                isCompleted: false,
+                completionPercentage: 0.0,
+                destination: AnyView(AnimatedTextAdventureView())
+            )
+            availableQuests.append(textAdventureQuest)
+            saveUserData()
+        }
     
     // Add AR Object Recognition lesson quest
     func addARLessons() {
@@ -302,6 +388,58 @@ class UserDataManager: ObservableObject {
         
         // Save changes
         saveUserData()
+    }
+    func getCategorizedQuests() -> (programmingQuests: [Quest], mathQuests: [Quest], otherQuests: [Quest]) {
+            var programmingQuests: [Quest] = []
+            var mathQuests: [Quest] = []
+            var otherQuests: [Quest] = []
+            
+            for quest in availableQuests {
+                if quest.title.contains("Python") ||
+                   quest.title.contains("Programación") ||
+                   quest.title.contains("Quiz") ||
+                   quest.title.contains("NLP") ||
+                   quest.title.contains("Comandos de Voz") {
+                    programmingQuests.append(quest)
+                } else if quest.title.contains("Matemát") || quest.title.contains("Math") || quest.iconName == "function" {
+                    mathQuests.append(quest)
+                } else {
+                    otherQuests.append(quest)
+                }
+            }
+            return (programmingQuests, mathQuests, otherQuests)
+        }
+}
+
+struct QuestCategoryView: View {
+    let categoryTitle: String
+    let categoryIcon: String
+    let quests: [Quest]
+    let color: Color
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            HStack {
+                Image(systemName: categoryIcon)
+                    .font(.system(size: 22))
+                    .foregroundColor(color)
+                
+                Text(categoryTitle)
+                    .font(.custom("Poppins-SemiBold", size: 18))
+                    .foregroundColor(.black)
+                
+                Spacer()
+            }
+            .padding(.horizontal)
+            
+            VStack(spacing: 12) {
+                ForEach(quests) { quest in
+                    AvailableQuestRow(quest: quest)
+                }
+            }
+            .padding(.horizontal)
+        }
+        .padding(.vertical, 10)
     }
 }
 
@@ -828,7 +966,7 @@ struct RecentTopicsView: View {
                         }
                     }
                     .padding()
-                    .frame(width: 150, height: 150)
+                    .frame(width: 150, height: 180)
                     .background(Color.white)
                     .cornerRadius(15)
                     .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
@@ -907,124 +1045,136 @@ struct RecentTopicsView: View {
                 }
             }
 
-            struct HomeView: View {
-                @StateObject private var userDataManager = UserDataManager.shared
-                @State private var refreshTrigger = false
-                
-                var body: some View {
-                    GeometryReader { geometry in
-                        ScrollView {
-                            VStack(spacing: 20) {
-                                // Header section with gradient background
-                                VStack(spacing: 20) {
-                                    // Avatar and greeting
-                                    AvatarView(
-                                        name: userDataManager.userProfile.name,
-                                        avatarName: userDataManager.userProfile.avatarName
-                                    )
-                                    .padding(.top, 20)
-                                    
-                                    // Progress stats
-                                    ProgressStatsView(
-                                        xpPoints: userDataManager.userProfile.xpPoints,
-                                        level: userDataManager.calculateLevel(),
-                                        levelProgress: userDataManager.calculateLevelProgress(),
-                                        dailyGoal: userDataManager.userProfile.dailyGoal,
-                                        dailyProgress: userDataManager.userProfile.dailyProgress,
-                                        streak: userDataManager.userProfile.streak
-                                    )
-                                    .padding(.bottom, 25)
-                                }
-                                .frame(width: geometry.size.width)
-                                .background(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [Color.blue, Color.purple]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .cornerRadius(30, corners: [.bottomLeft, .bottomRight])
-                                
-                                // Main content
-                                VStack(spacing: 20) {
-                                    // Continue learning card - show if has recent quests
-                                    if !userDataManager.recentQuests.isEmpty {
-                                        ContinueLearningCard(quest: userDataManager.recentQuests[0], screenWidth: geometry.size.width)
-                                            .padding(.horizontal)
-                                    }
-                                    
-                                    // AI-suggested quest
-                                    if let suggestedQuest = userDataManager.suggestedQuest {
-                                        SuggestedQuestCard(quest: suggestedQuest, screenWidth: geometry.size.width)
-                                            .padding(.horizontal)
-                                    }
-                                    
-                                    // Recent topics
-                                    if !userDataManager.recentQuests.isEmpty {
-                                        RecentTopicsView(topics: userDataManager.recentQuests)
-                                    }
-                                    
-                                    // All Available Quests
-                                    VStack(alignment: .leading, spacing: 15) {
-                                        Text("Todas las misiones")
-                                            .font(.custom("Poppins-SemiBold", size: 18))
-                                            .foregroundColor(.black)
-                                            .padding(.horizontal)
-                                        
-                                        VStack(spacing: 12) {
-                                            ForEach(userDataManager.availableQuests) { quest in
-                                                AvailableQuestRow(quest: quest)
-                                            }
-                                        }
-                                        .padding(.horizontal)
-                                    }
-                                }
-                                .padding(.top, 10)
-                                .padding(.bottom, 30)
-                            }
-                            .frame(width: geometry.size.width)
+struct HomeView: View {
+    @StateObject private var userDataManager = UserDataManager.shared
+    @State private var refreshTrigger = false
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Header section with gradient background
+                    VStack(spacing: 20) {
+                        // Avatar and greeting
+                        AvatarView(
+                            name: userDataManager.userProfile.name,
+                            avatarName: userDataManager.userProfile.avatarName
+                        )
+                        .padding(.top, 20)
+                        
+                        // Progress stats
+                        ProgressStatsView(
+                            xpPoints: userDataManager.userProfile.xpPoints,
+                            level: userDataManager.calculateLevel(),
+                            levelProgress: userDataManager.calculateLevelProgress(),
+                            dailyGoal: userDataManager.userProfile.dailyGoal,
+                            dailyProgress: userDataManager.userProfile.dailyProgress,
+                            streak: userDataManager.userProfile.streak
+                        )
+                        .padding(.bottom, 25)
+                    }
+                    .frame(width: geometry.size.width)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.blue, Color.purple]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .cornerRadius(30)
+                    
+                    // Main content
+                    VStack(spacing: 20) {
+                        // Continue learning card - show if has recent quests
+                        if !userDataManager.recentQuests.isEmpty {
+                            ContinueLearningCard(quest: userDataManager.recentQuests[0], screenWidth: geometry.size.width)
+                                .padding(.horizontal)
                         }
-                        .edgesIgnoringSafeArea(.top)
-                        .background(Color.gray.opacity(0.05).edgesIgnoringSafeArea(.all))
-                        .navigationBarHidden(true)
-                        .onAppear {
-                            // Refresh view when appearing
-                            refreshTrigger.toggle()
+                        
+                        // AI-suggested quest
+                        if let suggestedQuest = userDataManager.suggestedQuest {
+                            SuggestedQuestCard(quest: suggestedQuest, screenWidth: geometry.size.width)
+                                .padding(.horizontal)
+                        }
+                        
+                        // Recent topics
+                        if !userDataManager.recentQuests.isEmpty {
+                            RecentTopicsView(topics: userDataManager.recentQuests)
+                        }
+                        
+                        // Divider with title
+                        HStack {
+                            Text("Explora por categoría")
+                                .font(.custom("Poppins-Bold", size: 20))
+                                .foregroundColor(.black)
                             
-                            // Add both lessons to the available quests
-                            userDataManager.addARLessons() // This also calls addDictationLesson() internally
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 10)
+                        
+                        // Get categorized quests
+                        let categorizedQuests = userDataManager.getCategorizedQuests()
+                        
+                        // Programming section
+                        if !categorizedQuests.programmingQuests.isEmpty {
+                            QuestCategoryView(
+                                categoryTitle: "Programación",
+                                categoryIcon: "laptopcomputer",
+                                quests: categorizedQuests.programmingQuests,
+                                color: .blue
+                            )
+                        }
+                        
+                        // Math section
+                        if !categorizedQuests.mathQuests.isEmpty {
+                            QuestCategoryView(
+                                categoryTitle: "Matemáticas",
+                                categoryIcon: "function",
+                                quests: categorizedQuests.mathQuests,
+                                color: .purple
+                            )
+                        }
+                        
+                        // Other quests section
+                        if !categorizedQuests.otherQuests.isEmpty {
+                            QuestCategoryView(
+                                categoryTitle: "Otros Temas",
+                                categoryIcon: "square.stack.3d.up",
+                                quests: categorizedQuests.otherQuests,
+                                color: .orange
+                            )
                         }
                     }
+                    .padding(.top, 10)
+                    .padding(.bottom, 30)
                 }
+                .frame(width: geometry.size.width)
             }
-
-            // Extension for rounded corners on specific sides
-            extension View {
-                func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
-                    clipShape(RoundedCorner(radius: radius, corners: corners))
-                }
-            }
-
-            struct RoundedCorner: Shape {
-                var radius: CGFloat = .infinity
-                var corners: UIRectCorner = .allCorners
+            .edgesIgnoringSafeArea(.top)
+            .background(Color.gray.opacity(0.05).edgesIgnoringSafeArea(.all))
+            .navigationBarHidden(true)
+            .onAppear {
+                // Refresh view when appearing
+                refreshTrigger.toggle()
                 
-                func path(in rect: CGRect) -> Path {
-                    let path = UIBezierPath(
-                        roundedRect: rect,
-                        byRoundingCorners: corners,
-                        cornerRadii: CGSize(width: radius, height: radius)
-                    )
-                    return Path(path.cgPath)
-                }
+                // Add all lessons to the available quests
+                userDataManager.addARLessons() // This also calls addDictationLesson() internally
+                userDataManager.addMotionMathChallenge() // Add the new math challenge
+                userDataManager.addAnimatedTextAdventureQuest()
+                userDataManager.addVoiceCommandsChallengeQuest()  // NEW: add voice challenge quest
             }
+        }
+    }
+}
 
-            // Helper extension for HomeView
-            extension HomeView {
-                func addAllLessons() {
-                    userDataManager.addARLessons() // This calls addDictationLesson() internally
-                }
-            }
+// Helper extension for HomeView
+extension HomeView {
+    func addAllLessons() {
+        userDataManager.addARLessons() // This calls addDictationLesson() internally
+        userDataManager.addMotionMathChallenge() // Add motion math challenge
+    }
+}
 
             struct HomeView_Previews: PreviewProvider {
                 static var previews: some View {
