@@ -1,5 +1,12 @@
 import SwiftUI
 
+// Model for avatar selection
+struct AvatarOption: Identifiable {
+    let id = UUID()
+    let name: String
+    let imageName: String
+}
+
 // Model for learning style preference
 struct LearningStyle: Identifiable, Codable {
     let id: String
@@ -139,12 +146,33 @@ struct FloatingParticle: View {
     }
 }
 
+// Steps in onboarding process
+enum OnboardingStep {
+    case learningStyles
+    case nameInput
+    case avatarSelection
+    case complete
+}
+
 struct StylePickerView: View {
     @StateObject private var preferences = LearningPreferences.shared
+    @State private var currentStep: OnboardingStep = .learningStyles
+    @State private var userName: String = ""
+    @State private var selectedAvatar: AvatarOption?
     @State private var isNextButtonActive = false
     @State private var showParticles = false
+    @State private var navigateToHome = false
     
-                // Create random particles for background
+    // Avatar options
+    let avatarOptions = [
+        AvatarOption(name: "Wizard", imageName: "avatar1"),
+        AvatarOption(name: "Scholar", imageName: "avatar2"),
+        AvatarOption(name: "Explorer", imageName: "avatar3"),
+        AvatarOption(name: "Scientist", imageName: "avatar4"),
+        AvatarOption(name: "Sage", imageName: "avatar5")
+    ]
+    
+    // Create random particles for background
     private var particles: some View {
         ZStack {
             ForEach(0..<15, id: \.self) { index in
@@ -176,41 +204,156 @@ struct StylePickerView: View {
                 particles
             }
             
-            VStack(spacing: 20) {
-                Spacer()
-                    .frame(height: 60)
-                
-                // Title with animation
-                Text("¿Cómo te gustaría aprender?")
-                    .font(.custom("Poppins-Bold", size: 32))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
-                    .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 2)
-                
-                // Subtitle
-                Text("Escoge los estilos que quieras probar.")
-                    .font(.custom("Poppins-Regular", size: 18))
-                    .foregroundColor(.white.opacity(0.9))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
-                
-                // Learning style options
-                VStack(spacing: 12) {
-                    ForEach(LearningStyle.allStyles, id: \.id) { style in
-                        StyleOptionButton(style: style, preferences: preferences)
-                            .transition(.scale.combined(with: .opacity))
-                    }
+            // Main content based on current step
+            Group {
+                if currentStep == .learningStyles {
+                    learningStylesView
+                } else if currentStep == .nameInput {
+                    nameInputView
+                } else if currentStep == .avatarSelection {
+                    avatarSelectionView
                 }
+            }
+            .transition(.opacity)
+            .animation(.easeInOut, value: currentStep)
+            
+            // Navigation link to HomeView
+            NavigationLink(
+                destination: HomeView(),
+                isActive: $navigateToHome,
+                label: { EmptyView() }
+            )
+        }
+        .navigationBarHidden(true)
+        .onAppear {
+            // Delay particle effect for smoother loading
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                withAnimation {
+                    showParticles = true
+                }
+            }
+        }
+    }
+    
+    // MARK: - Learning Styles View
+    private var learningStylesView: some View {
+        VStack(spacing: 20) {
+            Spacer()
+                .frame(height: 60)
+            
+            // Title with animation
+            Text("¿Cómo te gustaría aprender?")
+                .font(.custom("Poppins-Bold", size: 32))
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
+                .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 2)
+            
+            // Subtitle
+            Text("Escoge los estilos que quieras probar.")
+                .font(.custom("Poppins-Regular", size: 18))
+                .foregroundColor(.white.opacity(0.9))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
+            
+            // Learning style options
+            VStack(spacing: 12) {
+                ForEach(LearningStyle.allStyles, id: \.id) { style in
+                    StyleOptionButton(style: style, preferences: preferences)
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+            
+            Spacer()
+            
+            // Next button
+            Button(action: {
+                withAnimation {
+                    currentStep = .nameInput
+                }
+            }) {
+                Text("Continuar")
+                    .font(.custom("Poppins-SemiBold", size: 18))
+                    .foregroundColor(.blue)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 60)
+                    .background(
+                        RoundedRectangle(cornerRadius: 30)
+                            .fill(Color.white)
+                            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+                    )
+                    .padding(.horizontal, 40)
+                    .opacity(preferences.selectedStyles.isEmpty ? 0.7 : 1.0)
+            }
+            .disabled(preferences.selectedStyles.isEmpty)
+            .padding(.bottom, 40)
+        }
+    }
+    
+    // MARK: - Name Input View
+    private var nameInputView: some View {
+        VStack(spacing: 25) {
+            Spacer()
+                .frame(height: 60)
+            
+            Text("¿Cómo te llamas?")
+                .font(.custom("Poppins-Bold", size: 32))
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
+                .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 2)
+            
+            Text("Dinos tu nombre para personalizar tu experiencia")
+                .font(.custom("Poppins-Regular", size: 18))
+                .foregroundColor(.white.opacity(0.9))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+            
+            // Name text field
+            ZStack {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.white)
+                    .frame(height: 60)
+                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
                 
-                Spacer()
+                TextField("Escribe tu nombre", text: $userName)
+                    .font(.custom("Poppins-Regular", size: 18))
+                    .padding(.horizontal, 20)
+                    .frame(height: 60)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 40)
+            .padding(.top, 20)
+            
+            Spacer()
+            
+            // Navigation buttons
+            HStack(spacing: 20) {
+                // Back button
+                Button(action: {
+                    withAnimation {
+                        currentStep = .learningStyles
+                    }
+                }) {
+                    Text("Atrás")
+                        .font(.custom("Poppins-SemiBold", size: 18))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 60)
+                        .background(
+                            RoundedRectangle(cornerRadius: 30)
+                                .stroke(Color.white, lineWidth: 2)
+                        )
+                }
                 
                 // Next button
                 Button(action: {
-                    // Navigation action here
+                    withAnimation {
+                        currentStep = .avatarSelection
+                    }
                 }) {
-                    Text("Empezar")
+                    Text("Continuar")
                         .font(.custom("Poppins-SemiBold", size: 18))
                         .foregroundColor(.blue)
                         .frame(maxWidth: .infinity)
@@ -220,20 +363,136 @@ struct StylePickerView: View {
                                 .fill(Color.white)
                                 .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
                         )
-                        .padding(.horizontal, 40)
-                        .opacity(preferences.selectedStyles.isEmpty ? 0.7 : 1.0)
+                        .opacity(userName.isEmpty ? 0.7 : 1.0)
                 }
-                .disabled(preferences.selectedStyles.isEmpty)
-                .padding(.bottom, 40)
+                .disabled(userName.isEmpty)
             }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 40)
         }
-        .onAppear {
-            // Delay particle effect for smoother loading
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                withAnimation {
-                    showParticles = true
+    }
+    
+    // MARK: - Avatar Selection View
+    private var avatarSelectionView: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                Spacer()
+                    .frame(height: 40)
+                
+                Text("Escoge tu avatar")
+                    .font(.custom("Poppins-Bold", size: 32))
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
+                    .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 2)
+                
+                Text("¿Quién te representará en tu viaje de aprendizaje?")
+                    .font(.custom("Poppins-Regular", size: 18))
+                    .foregroundColor(.white.opacity(0.9))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
+            
+            // Avatar grid
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 15) {
+                    ForEach(avatarOptions) { avatar in
+                        VStack {
+                            // Avatar image with selection indicator
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white)
+                                    .frame(width: 80, height: 80)
+                                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+                                
+                                // Using wizardWicho for all avatars
+                                Image("wizardWicho")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 60, height: 60)
+                                    .clipShape(Circle())
+                                
+                                // Selection indicator
+                                if selectedAvatar?.id == avatar.id {
+                                    Circle()
+                                        .stroke(Color.blue, lineWidth: 4)
+                                        .frame(width: 84, height: 84)
+                                }
+                            }
+                            .onTapGesture {
+                                withAnimation(.spring()) {
+                                    selectedAvatar = avatar
+                                }
+                            }
+                            
+                            Text(avatar.name)
+                                .font(.custom("Poppins-Regular", size: 14))
+                                .foregroundColor(.white)
+                        }
+                    }
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
             }
+            .frame(maxHeight: 300)
+            
+                // Navigation buttons
+                HStack(spacing: 20) {
+                    // Back button
+                    Button(action: {
+                        withAnimation {
+                            currentStep = .nameInput
+                        }
+                    }) {
+                        Text("Atrás")
+                            .font(.custom("Poppins-SemiBold", size: 18))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 60)
+                            .background(
+                                RoundedRectangle(cornerRadius: 30)
+                                    .stroke(Color.white, lineWidth: 2)
+                            )
+                    }
+                    
+                    // Complete button
+                    Button(action: {
+                        // Save user profile data
+                        let userProfile = UserProfile(
+                            name: userName,
+                            avatarName: selectedAvatar?.imageName ?? "avatar1",
+                            xpPoints: 0,
+                            dailyGoal: 100,
+                            dailyProgress: 0,
+                            streak: 0,
+                            learningStyles: preferences.selectedStyles
+                        )
+                        
+                        // Save to UserDataManager
+                        UserDataManager.shared.userProfile = userProfile
+                        UserDataManager.shared.saveUserData()
+                        
+                        // Navigate to HomeView
+                        navigateToHome = true
+                    }) {
+                        Text("¡Empezar!")
+                            .font(.custom("Poppins-SemiBold", size: 18))
+                            .foregroundColor(.blue)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 60)
+                            .background(
+                                RoundedRectangle(cornerRadius: 30)
+                                    .fill(Color.white)
+                                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+                            )
+                            .opacity(selectedAvatar == nil ? 0.7 : 1.0)
+                    }
+                    .disabled(selectedAvatar == nil)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 40)
+                .padding(.top, 20)
+            }
+            .padding(.bottom, 20)
         }
     }
 }

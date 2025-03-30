@@ -39,8 +39,9 @@ struct Quest: Identifiable {
     let difficulty: QuestDifficulty
     let learningStyles: [String]
     let iconName: String
-    let isCompleted: Bool
-    let completionPercentage: Double
+    var isCompleted: Bool
+    var completionPercentage: Double
+    let destination: AnyView?
     
     // For AI-suggested quests
     var isRecommended: Bool = false
@@ -66,9 +67,9 @@ class UserDataManager: ObservableObject {
     static let shared = UserDataManager()
     
     @Published var userProfile: UserProfile
-    @Published var currentQuest: Quest?
+    @Published var availableQuests: [Quest] = []
+    @Published var recentQuests: [Quest] = []
     @Published var suggestedQuest: Quest?
-    @Published var recentTopics: [Quest] = []
     
     // Core ML integration points will be added here
     private var mlRecommendationSystem: Any? = nil
@@ -95,75 +96,81 @@ class UserDataManager: ObservableObject {
     }
     
     private func loadQuests() {
-        // In a real app, these would be loaded from a database or API
-        // Sample data for development
-        currentQuest = Quest(
-            title: "Python Basics",
-            description: "Learn the fundamentals of Python programming language",
+        // Create quests with real destinations to our learning activities
+        let musicProgrammingQuest = Quest(
+            title: "Música y Programación",
+            description: "Aprende conceptos de programación a través de patrones musicales",
             xpReward: 150,
             duration: 25,
             difficulty: .intermediate,
-            learningStyles: ["visual", "reading"],
-            iconName: "laptopcomputer",
+            learningStyles: ["auditory"],
+            iconName: "music.note",
             isCompleted: false,
-            completionPercentage: 0.45
+            completionPercentage: 0.0,
+            destination: AnyView(MusicProgrammingView())
         )
         
-        suggestedQuest = Quest(
-            title: "Data Visualization",
-            description: "Create interactive charts using Python libraries",
+        let nlpQuizQuest = Quest(
+            title: "Quiz de Programación",
+            description: "Demuestra tus conocimientos respondiendo preguntas sobre programación",
             xpReward: 200,
             duration: 30,
             difficulty: .intermediate,
-            learningStyles: ["visual", "kinesthetic"],
-            iconName: "chart.bar.fill",
+            learningStyles: ["reading"],
+            iconName: "text.book.closed",
             isCompleted: false,
-            completionPercentage: 0,
-            isRecommended: true,
-            recommendationReason: "Matches your visual learning style"
+            completionPercentage: 0.0,
+            destination: AnyView(NLPQuizView())
         )
         
-        recentTopics = [
-            Quest(
-                title: "Variables & Types",
-                description: "Understanding data types and variables in Python",
-                xpReward: 100,
-                duration: 15,
-                difficulty: .beginner,
-                learningStyles: ["reading", "visual"],
-                iconName: "doc.text",
-                isCompleted: true,
-                completionPercentage: 1.0
-            ),
-            Quest(
-                title: "Control Flow",
-                description: "Learn if-else statements and loops in Python",
-                xpReward: 120,
-                duration: 20,
-                difficulty: .beginner,
-                learningStyles: ["visual", "kinesthetic"],
-                iconName: "arrow.branch",
-                isCompleted: true,
-                completionPercentage: 1.0
-            ),
-            Quest(
-                title: "Functions",
-                description: "Create and use functions in Python",
-                xpReward: 130,
-                duration: 20,
-                difficulty: .intermediate,
-                learningStyles: ["reading", "auditory"],
-                iconName: "function",
-                isCompleted: false,
-                completionPercentage: 0.8
-            )
-        ]
+        let arPuzzleQuest = Quest(
+            title: "Rompecabezas AR",
+            description: "Resuelve rompecabezas en realidad aumentada",
+            xpReward: 180,
+            duration: 20,
+            difficulty: .beginner,
+            learningStyles: ["kinesthetic", "visual"],
+            iconName: "cube",
+            isCompleted: false,
+            completionPercentage: 0.0,
+            destination: nil  // Will be implemented later
+        )
+        
+        let visualizationQuest = Quest(
+            title: "Visualización de Datos",
+            description: "Explora conceptos a través de visualizaciones interactivas",
+            xpReward: 160,
+            duration: 15,
+            difficulty: .beginner,
+            learningStyles: ["visual"],
+            iconName: "chart.bar.fill",
+            isCompleted: false,
+            completionPercentage: 0.0,
+            destination: nil  // Will be implemented later
+        )
+        
+        // Add all quests to available quests
+        availableQuests = [musicProgrammingQuest, nlpQuizQuest, arPuzzleQuest, visualizationQuest]
+        
+        // Add some quests to recent for a good UI appearance
+        recentQuests = []
+        
+        // Set a suggested quest based on user's learning style
+        if let suggested = availableQuests.first(where: {
+            quest in !Set(quest.learningStyles).isDisjoint(with: Set(userProfile.learningStyles)) && quest.destination != nil
+        }) {
+            var suggestedCopy = suggested
+            suggestedCopy.isRecommended = true
+            suggestedCopy.recommendationReason = "Coincide con tu estilo de aprendizaje \(userProfile.learningStyles.first ?? "")"
+            suggestedQuest = suggestedCopy
+        } else {
+            suggestedQuest = musicProgrammingQuest
+        }
     }
     
     func generateRecommendations() {
         // This is where Core ML integration would happen
         // Based on user behavior, learning styles, and progress
-        // For now, we're just using the sample suggestedQuest
     }
     
     func calculateLevel() -> Int {
@@ -179,6 +186,88 @@ class UserDataManager: ObservableObject {
         let xpRequiredForNextLevel = xpForNextLevel - xpForCurrentLevel
         
         return Double(xpInCurrentLevel) / Double(xpRequiredForNextLevel)
+    }
+    
+    func markQuestAsStarted(_ questTitle: String) {
+        // Find the quest and update its completion percentage
+        if let index = availableQuests.firstIndex(where: { $0.title == questTitle }) {
+            var updatedQuest = availableQuests[index]
+            // Only update if it's not completed yet
+            if !updatedQuest.isCompleted && updatedQuest.completionPercentage < 0.1 {
+                updatedQuest.completionPercentage = 0.1  // Started
+                availableQuests[index] = updatedQuest
+                
+                // Add to recent if not already there
+                if !recentQuests.contains(where: { $0.title == questTitle }) {
+                    recentQuests.insert(updatedQuest, at: 0)
+                    if recentQuests.count > 3 {
+                        recentQuests.removeLast()
+                    }
+                }
+            }
+        }
+    }
+    
+    func markQuestAsCompleted(_ questTitle: String) {
+        // Update in available quests
+        if let index = availableQuests.firstIndex(where: { $0.title == questTitle }) {
+            var updatedQuest = availableQuests[index]
+            updatedQuest.isCompleted = true
+            updatedQuest.completionPercentage = 1.0
+            availableQuests[index] = updatedQuest
+            
+            // Update in recent quests if present
+            if let recentIndex = recentQuests.firstIndex(where: { $0.title == questTitle }) {
+                var recentQuest = recentQuests[recentIndex]
+                recentQuest.isCompleted = true
+                recentQuest.completionPercentage = 1.0
+                recentQuests[recentIndex] = recentQuest
+            }
+            
+            // Save user data
+            saveUserData()
+        }
+    }
+    
+    // Helper to check if a quest is completed
+    func isQuestCompleted(_ questTitle: String) -> Bool {
+        return availableQuests.first(where: { $0.title == questTitle })?.isCompleted ?? false
+    }
+    
+    // Add dictation lesson quest
+    func addDictationLesson() {
+        // Check if the lesson already exists
+        if availableQuests.contains(where: { $0.title == "Dictado y Comprensión Auditiva" }) {
+            return
+        }
+        
+        // Create the dictation lesson quest
+        let dictationQuest = Quest(
+            title: "Dictado y Comprensión Auditiva",
+            description: "Aprende a utilizar AVSpeechSynthesizer para la lectura de texto y mejora tu comprensión auditiva",
+            xpReward: 150,
+            duration: 20,
+            difficulty: .intermediate,
+            learningStyles: ["auditory", "reading"],
+            iconName: "ear.and.waveform",
+            isCompleted: false,
+            completionPercentage: 0.0,
+            destination: AnyView(DictationLessonView())
+        )
+        
+        // Add to available quests
+        availableQuests.append(dictationQuest)
+        
+        // If user has auditory learning style, make it the suggested quest
+        if userProfile.learningStyles.contains("auditory") && suggestedQuest?.title != "Dictado y Comprensión Auditiva" {
+            var suggestedCopy = dictationQuest
+            suggestedCopy.isRecommended = true
+            suggestedCopy.recommendationReason = "Perfecto para tu estilo de aprendizaje auditivo"
+            suggestedQuest = suggestedCopy
+        }
+        
+        // Save changes
+        saveUserData()
     }
 }
 
@@ -203,10 +292,11 @@ struct AvatarView: View {
     var body: some View {
         HStack(spacing: 15) {
             // Avatar image
-            Image(avatarName)
+            Image(systemName: "person.circle.fill")  // Fallback to system icon if image not available
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .frame(width: 60, height: 60)
+                .foregroundColor(.white)
                 .background(Color.gray.opacity(0.2))
                 .clipShape(Circle())
                 .overlay(Circle().stroke(Color.white, lineWidth: 2))
@@ -269,21 +359,23 @@ struct ProgressStatsView: View {
             .padding(.horizontal)
             
             // Level progress bar
-            ZStack(alignment: .leading) {
-                Rectangle()
-                    .foregroundColor(Color.white.opacity(0.2))
-                    .frame(height: 8)
-                    .cornerRadius(4)
-                
-                Rectangle()
-                    .foregroundColor(.white)
-                    .frame(width: max(20, UIScreen.main.bounds.width - 40) * CGFloat(levelProgress), height: 8)
-                    .cornerRadius(4)
+            HStack {
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .foregroundColor(Color.white.opacity(0.2))
+                        .frame(height: 8)
+                        .cornerRadius(4)
+                    
+                    Rectangle()
+                        .foregroundColor(.white)
+                        .frame(width: max(4, UIScreen.main.bounds.width - 40) * CGFloat(levelProgress), height: 8)
+                        .cornerRadius(4)
+                }
             }
             .padding(.horizontal)
             
             // Daily goal progress
-            HStack(alignment: .center) {
+            HStack {
                 Text("Meta diaria:")
                     .font(.custom("Poppins-Regular", size: 14))
                     .foregroundColor(.white.opacity(0.8))
@@ -296,7 +388,7 @@ struct ProgressStatsView: View {
                     
                     Rectangle()
                         .foregroundColor(.green)
-                        .frame(width: 150 * CGFloat(dailyProgress) / CGFloat(dailyGoal), height: 8)
+                        .frame(width: max(0, min(150, 150 * CGFloat(dailyProgress) / CGFloat(max(1, dailyGoal)))), height: 8)
                         .cornerRadius(4)
                 }
                 
@@ -311,27 +403,35 @@ struct ProgressStatsView: View {
 
 struct ContinueLearningCard: View {
     let quest: Quest
+    let screenWidth: CGFloat
+    @ObservedObject private var userDataManager = UserDataManager.shared
     
     var body: some View {
         VStack(spacing: 15) {
             HStack {
-                Text("Continúa aprendiendo")
+                Text(quest.isCompleted ? "Lección Completada" : "Continúa aprendiendo")
                     .font(.custom("Poppins-SemiBold", size: 18))
                     .foregroundColor(.black)
                 
                 Spacer()
+                
+                if quest.isCompleted {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.system(size: 22))
+                }
             }
             
             HStack(spacing: 15) {
                 // Icon
                 ZStack {
                     Circle()
-                        .fill(Color.blue.opacity(0.1))
+                        .fill(quest.isCompleted ? Color.green.opacity(0.1) : Color.blue.opacity(0.1))
                         .frame(width: 60, height: 60)
                     
-                    Image(systemName: quest.iconName)
+                    Image(systemName: quest.isCompleted ? "checkmark" : quest.iconName)
                         .font(.system(size: 26))
-                        .foregroundColor(.blue)
+                        .foregroundColor(quest.isCompleted ? .green : .blue)
                 }
                 
                 VStack(alignment: .leading, spacing: 8) {
@@ -340,17 +440,20 @@ struct ContinueLearningCard: View {
                         .foregroundColor(.black)
                     
                     // Progress bar
-                    ZStack(alignment: .leading) {
-                        Rectangle()
-                            .foregroundColor(Color.gray.opacity(0.2))
-                            .frame(height: 6)
-                            .cornerRadius(3)
-                        
-                        Rectangle()
-                            .foregroundColor(.blue)
-                            .frame(width: CGFloat(quest.completionPercentage) * (UIScreen.main.bounds.width - 115), height: 6)
-                            .cornerRadius(3)
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Rectangle()
+                                .foregroundColor(Color.gray.opacity(0.2))
+                                .frame(height: 6)
+                                .cornerRadius(3)
+                            
+                            Rectangle()
+                                .foregroundColor(quest.isCompleted ? .green : .blue)
+                                .frame(width: geo.size.width * CGFloat(quest.completionPercentage), height: 6)
+                                .cornerRadius(3)
+                        }
                     }
+                    .frame(height: 6)
                     
                     HStack {
                         Text("\(Int(quest.completionPercentage * 100))% completado")
@@ -359,26 +462,61 @@ struct ContinueLearningCard: View {
                         
                         Spacer()
                         
-                        Text("\(quest.duration) min restantes")
-                            .font(.custom("Poppins-Regular", size: 12))
-                            .foregroundColor(.gray)
+                        if quest.isCompleted {
+                            Text("Completado")
+                                .font(.custom("Poppins-Regular", size: 12))
+                                .foregroundColor(.green)
+                        } else {
+                            Text("\(quest.duration) min restantes")
+                                .font(.custom("Poppins-Regular", size: 12))
+                                .foregroundColor(.gray)
+                        }
                     }
                 }
+                .frame(maxWidth: .infinity)
                 
                 Spacer()
             }
             
-            Button(action: {
-                // Action to continue the lesson
-            }) {
-                Text("Continuar")
-                    .font(.custom("Poppins-SemiBold", size: 16))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 30)
-                    .padding(.vertical, 12)
-                    .background(Color.blue)
-                    .cornerRadius(25)
-                    .shadow(color: Color.blue.opacity(0.3), radius: 5, x: 0, y: 3)
+            if let destination = quest.destination, !quest.isCompleted {
+                NavigationLink(destination: destination) {
+                    Text("Continuar")
+                        .font(.custom("Poppins-SemiBold", size: 16))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 30)
+                        .padding(.vertical, 12)
+                        .background(Color.blue)
+                        .cornerRadius(25)
+                        .shadow(color: Color.blue.opacity(0.3), radius: 5, x: 0, y: 3)
+                }
+                .simultaneousGesture(TapGesture().onEnded {
+                    userDataManager.markQuestAsStarted(quest.title)
+                })
+            } else if !quest.isCompleted {
+                Button(action: {
+                    userDataManager.markQuestAsStarted(quest.title)
+                }) {
+                    Text("Continuar")
+                        .font(.custom("Poppins-SemiBold", size: 16))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 30)
+                        .padding(.vertical, 12)
+                        .background(Color.blue)
+                        .cornerRadius(25)
+                        .shadow(color: Color.blue.opacity(0.3), radius: 5, x: 0, y: 3)
+                }
+            } else {
+                Button(action: {}) {
+                    Text("Completado")
+                        .font(.custom("Poppins-SemiBold", size: 16))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 30)
+                        .padding(.vertical, 12)
+                        .background(Color.green)
+                        .cornerRadius(25)
+                        .shadow(color: Color.green.opacity(0.3), radius: 5, x: 0, y: 3)
+                }
+                .disabled(true)
             }
         }
         .padding()
@@ -390,6 +528,8 @@ struct ContinueLearningCard: View {
 
 struct SuggestedQuestCard: View {
     let quest: Quest
+    let screenWidth: CGFloat
+    @ObservedObject private var userDataManager = UserDataManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
@@ -467,6 +607,7 @@ struct SuggestedQuestCard: View {
                             .cornerRadius(12)
                     }
                 }
+                .frame(maxWidth: .infinity)
             }
             
             if !quest.recommendationReason.isEmpty {
@@ -484,18 +625,49 @@ struct SuggestedQuestCard: View {
                 .padding(.vertical, 5)
             }
             
-            Button(action: {
-                // Action to start this quest
-            }) {
-                Text("Empezar")
-                    .font(.custom("Poppins-SemiBold", size: 16))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 30)
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: .infinity)
-                    .background(quest.difficulty.color)
-                    .cornerRadius(25)
-                    .shadow(color: quest.difficulty.color.opacity(0.3), radius: 5, x: 0, y: 3)
+            if let destination = quest.destination, !quest.isCompleted {
+                NavigationLink(destination: destination) {
+                    Text("Empezar")
+                        .font(.custom("Poppins-SemiBold", size: 16))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 30)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity)
+                        .background(quest.difficulty.color)
+                        .cornerRadius(25)
+                        .shadow(color: quest.difficulty.color.opacity(0.3), radius: 5, x: 0, y: 3)
+                }
+                .simultaneousGesture(TapGesture().onEnded {
+                    userDataManager.markQuestAsStarted(quest.title)
+                })
+            } else if quest.isCompleted {
+                Button(action: {}) {
+                    Text("Completado")
+                        .font(.custom("Poppins-SemiBold", size: 16))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 30)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.green)
+                        .cornerRadius(25)
+                        .shadow(color: Color.green.opacity(0.3), radius: 5, x: 0, y: 3)
+                }
+                .disabled(true)
+            } else {
+                Button(action: {
+                    // Action to start this quest
+                    userDataManager.markQuestAsStarted(quest.title)
+                }) {
+                    Text("Empezar")
+                        .font(.custom("Poppins-SemiBold", size: 16))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 30)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity)
+                        .background(quest.difficulty.color)
+                        .cornerRadius(25)
+                        .shadow(color: quest.difficulty.color.opacity(0.3), radius: 5, x: 0, y: 3)
+                }
             }
         }
         .padding()
@@ -507,6 +679,7 @@ struct SuggestedQuestCard: View {
 
 struct RecentTopicsView: View {
     let topics: [Quest]
+    @ObservedObject private var userDataManager = UserDataManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
@@ -517,60 +690,7 @@ struct RecentTopicsView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 15) {
                     ForEach(topics) { topic in
-                        VStack(alignment: .leading, spacing: 12) {
-                            // Topic icon and completion indicator
-                            HStack {
-                                ZStack {
-                                    Circle()
-                                        .fill(topic.difficulty.color.opacity(0.1))
-                                        .frame(width: 40, height: 40)
-                                    
-                                    Image(systemName: topic.iconName)
-                                        .font(.system(size: 20))
-                                        .foregroundColor(topic.difficulty.color)
-                                }
-                                
-                                Spacer()
-                                
-                                if topic.isCompleted {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
-                                } else {
-                                    Text("\(Int(topic.completionPercentage * 100))%")
-                                        .font(.custom("Poppins-SemiBold", size: 14))
-                                        .foregroundColor(topic.difficulty.color)
-                                }
-                            }
-                            
-                            Spacer()
-                            
-                            Text(topic.title)
-                                .font(.custom("Poppins-SemiBold", size: 16))
-                                .foregroundColor(.black)
-                                .lineLimit(2)
-                                .multilineTextAlignment(.leading)
-                                .fixedSize(horizontal: false, vertical: true)
-                            
-                            // Progress bar for incomplete topics
-                            if !topic.isCompleted {
-                                ZStack(alignment: .leading) {
-                                    Rectangle()
-                                        .foregroundColor(Color.gray.opacity(0.2))
-                                        .frame(height: 4)
-                                        .cornerRadius(2)
-                                    
-                                    Rectangle()
-                                        .foregroundColor(topic.difficulty.color)
-                                        .frame(width: CGFloat(topic.completionPercentage) * 120, height: 4)
-                                        .cornerRadius(2)
-                                }
-                            }
-                        }
-                        .padding()
-                        .frame(width: 150, height: 150)
-                        .background(Color.white)
-                        .cornerRadius(15)
-                        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                        RecentTopicCard(topic: topic)
                     }
                 }
             }
@@ -579,66 +699,268 @@ struct RecentTopicsView: View {
     }
 }
 
-struct HomeView: View {
-    @StateObject private var userDataManager = UserDataManager.shared
+struct RecentTopicCard: View {
+    let topic: Quest
+    @ObservedObject private var userDataManager = UserDataManager.shared
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Header section with gradient background
-                VStack(spacing: 20) {
-                    // Avatar and greeting
-                    AvatarView(
-                        name: userDataManager.userProfile.name,
-                        avatarName: userDataManager.userProfile.avatarName
-                    )
-                    .padding(.top, 20)
+        VStack(alignment: .leading, spacing: 12) {
+            // Topic icon and completion indicator
+            HStack {
+                ZStack {
+                    Circle()
+                        .fill(topic.isCompleted ? Color.green.opacity(0.1) : topic.difficulty.color.opacity(0.1))
+                        .frame(width: 40, height: 40)
                     
-                    // Progress stats
-                    ProgressStatsView(
-                        xpPoints: userDataManager.userProfile.xpPoints,
-                        level: userDataManager.calculateLevel(),
-                        levelProgress: userDataManager.calculateLevelProgress(),
-                        dailyGoal: userDataManager.userProfile.dailyGoal,
-                        dailyProgress: userDataManager.userProfile.dailyProgress,
-                        streak: userDataManager.userProfile.streak
-                    )
-                    .padding(.bottom, 25)
+                    Image(systemName: topic.isCompleted ? "checkmark" : topic.iconName)
+                        .font(.system(size: 20))
+                        .foregroundColor(topic.isCompleted ? .green : topic.difficulty.color)
                 }
-                .background(
-                    LinearGradient(
-                        gradient: Gradient(colors: [Color.blue, Color.purple]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .cornerRadius(30, corners: [.bottomLeft, .bottomRight])
                 
-                // Main content
-                VStack(spacing: 20) {
-                    // Continue learning card
-                    if let currentQuest = userDataManager.currentQuest {
-                        ContinueLearningCard(quest: currentQuest)
-                            .padding(.horizontal)
-                    }
-                    
-                    // AI-suggested quest
-                    if let suggestedQuest = userDataManager.suggestedQuest {
-                        SuggestedQuestCard(quest: suggestedQuest)
-                            .padding(.horizontal)
-                    }
-                    
-                    // Recent topics
-                    if !userDataManager.recentTopics.isEmpty {
-                        RecentTopicsView(topics: userDataManager.recentTopics)
+                Spacer()
+                
+                if topic.isCompleted {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                } else {
+                    Text("\(Int(topic.completionPercentage * 100))%")
+                        .font(.custom("Poppins-SemiBold", size: 14))
+                        .foregroundColor(topic.difficulty.color)
+                }
+            }
+            
+            Spacer()
+            
+            Text(topic.title)
+                .font(.custom("Poppins-SemiBold", size: 16))
+                .foregroundColor(.black)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+            
+            // Progress bar for incomplete topics
+            if !topic.isCompleted {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .foregroundColor(Color.gray.opacity(0.2))
+                            .frame(height: 4)
+                            .cornerRadius(2)
+                        
+                        Rectangle()
+                            .foregroundColor(topic.difficulty.color)
+                            .frame(width: geo.size.width * CGFloat(topic.completionPercentage), height: 4)
+                            .cornerRadius(2)
                     }
                 }
-                .padding(.top, 10)
-                .padding(.bottom, 30)
+                .frame(height: 4)
+            }
+            
+            if let destination = topic.destination, !topic.isCompleted {
+                NavigationLink(destination: destination) {
+                    Text("Continuar")
+                        .font(.custom("Poppins-SemiBold", size: 12))
+                        .foregroundColor(topic.difficulty.color)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(topic.difficulty.color.opacity(0.1))
+                        .cornerRadius(12)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .simultaneousGesture(TapGesture().onEnded {
+                    userDataManager.markQuestAsStarted(topic.title)
+                })
+            } else if topic.isCompleted {
+                Text("Completado")
+                    .font(.custom("Poppins-SemiBold", size: 12))
+                    .foregroundColor(.green)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.green.opacity(0.1))
+                    .cornerRadius(12)
+            } else {
+                Button(action: {
+                    userDataManager.markQuestAsStarted(topic.title)
+                }) {
+                    Text("Continuar")
+                        .font(.custom("Poppins-SemiBold", size: 12))
+                        .foregroundColor(topic.difficulty.color)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(topic.difficulty.color.opacity(0.1))
+                        .cornerRadius(12)
+                }
+                .buttonStyle(PlainButtonStyle())
             }
         }
-        .edgesIgnoringSafeArea(.top)
-        .background(Color.gray.opacity(0.05).edgesIgnoringSafeArea(.all))
+        .padding()
+        .frame(width: 150, height: 150)
+        .background(Color.white)
+        .cornerRadius(15)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+    }
+}
+
+struct AvailableQuestRow: View {
+    let quest: Quest
+    @ObservedObject private var userDataManager = UserDataManager.shared
+    
+    var body: some View {
+        HStack(spacing: 15) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(quest.isCompleted ? Color.green.opacity(0.1) : quest.difficulty.color.opacity(0.1))
+                    .frame(width: 45, height: 45)
+                
+                Image(systemName: quest.isCompleted ? "checkmark" : quest.iconName)
+                    .font(.system(size: 20))
+                    .foregroundColor(quest.isCompleted ? .green : quest.difficulty.color)
+            }
+            
+            // Title and description
+            VStack(alignment: .leading, spacing: 4) {
+                Text(quest.title)
+                    .font(.custom("Poppins-SemiBold", size: 16))
+                    .foregroundColor(.black)
+                
+                if quest.isCompleted {
+                    Text("Completado • \(quest.xpReward) XP ganados")
+                        .font(.custom("Poppins-Regular", size: 12))
+                        .foregroundColor(.green)
+                } else {
+                    Text("\(quest.duration) min • \(quest.xpReward) XP")
+                        .font(.custom("Poppins-Regular", size: 12))
+                        .foregroundColor(.gray)
+                }
+            }
+            
+            Spacer()
+            
+            // Navigation to quest
+            if let destination = quest.destination, !quest.isCompleted {
+                NavigationLink(destination: destination) {
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(quest.difficulty.color)
+                        .padding(8)
+                        .background(quest.difficulty.color.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .simultaneousGesture(TapGesture().onEnded {
+                    userDataManager.markQuestAsStarted(quest.title)
+                })
+            } else if quest.isCompleted {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                    .padding(8)
+            } else {
+                Button(action: {
+                    userDataManager.markQuestAsStarted(quest.title)
+                }) {
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(quest.difficulty.color)
+                        .padding(8)
+                        .background(quest.difficulty.color.opacity(0.1))
+                        .clipShape(Circle())
+                }
+            }
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .background(Color.white)
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+    }
+}
+
+struct HomeView: View {
+    @StateObject private var userDataManager = UserDataManager.shared
+    @State private var refreshTrigger = false
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Header section with gradient background
+                    VStack(spacing: 20) {
+                        // Avatar and greeting
+                        AvatarView(
+                            name: userDataManager.userProfile.name,
+                            avatarName: userDataManager.userProfile.avatarName
+                        )
+                        .padding(.top, 20)
+                        
+                        // Progress stats
+                        ProgressStatsView(
+                            xpPoints: userDataManager.userProfile.xpPoints,
+                            level: userDataManager.calculateLevel(),
+                            levelProgress: userDataManager.calculateLevelProgress(),
+                            dailyGoal: userDataManager.userProfile.dailyGoal,
+                            dailyProgress: userDataManager.userProfile.dailyProgress,
+                            streak: userDataManager.userProfile.streak
+                        )
+                        .padding(.bottom, 25)
+                    }
+                    .frame(width: geometry.size.width)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.blue, Color.purple]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .cornerRadius(30, corners: [.bottomLeft, .bottomRight])
+                    
+                    // Main content
+                    VStack(spacing: 20) {
+                        // Continue learning card - show if has recent quests
+                        if !userDataManager.recentQuests.isEmpty {
+                            ContinueLearningCard(quest: userDataManager.recentQuests[0], screenWidth: geometry.size.width)
+                                .padding(.horizontal)
+                        }
+                        
+                        // AI-suggested quest
+                        if let suggestedQuest = userDataManager.suggestedQuest {
+                            SuggestedQuestCard(quest: suggestedQuest, screenWidth: geometry.size.width)
+                                .padding(.horizontal)
+                        }
+                        
+                        // Recent topics
+                        if !userDataManager.recentQuests.isEmpty {
+                            RecentTopicsView(topics: userDataManager.recentQuests)
+                        }
+                        
+                        // All Available Quests
+                        VStack(alignment: .leading, spacing: 15) {
+                            Text("Todas las misiones")
+                                .font(.custom("Poppins-SemiBold", size: 18))
+                                .foregroundColor(.black)
+                                .padding(.horizontal)
+                            
+                            VStack(spacing: 12) {
+                                ForEach(userDataManager.availableQuests) { quest in
+                                    AvailableQuestRow(quest: quest)
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
+                    .padding(.top, 10)
+                    .padding(.bottom, 30)
+                }
+                .frame(width: geometry.size.width)
+            }
+            .edgesIgnoringSafeArea(.top)
+            .background(Color.gray.opacity(0.05).edgesIgnoringSafeArea(.all))
+            .navigationBarHidden(true)
+            .onAppear {
+                // Refresh view when appearing
+                refreshTrigger.toggle()
+                
+                // Add dictation lesson
+                userDataManager.addDictationLesson()
+            }
+        }
     }
 }
 

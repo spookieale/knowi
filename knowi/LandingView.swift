@@ -90,9 +90,9 @@ struct LandingView: View {
                 Spacer()
                 
                 // Button with pulse animation
-                Button(action: {
-                    // Navigate to next view
-                }) {
+                // Replace the Button in LandingView with this NavigationLink:
+
+                NavigationLink(destination: StylePickerView()) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 40)
                             .fill(Color.white)
