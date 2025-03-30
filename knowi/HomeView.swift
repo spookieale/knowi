@@ -1164,6 +1164,7 @@ struct HomeView: View {
                 userDataManager.addAnimatedTextAdventureQuest()
                 userDataManager.addVoiceCommandsChallengeQuest()  // NEW: add voice challenge quest
             }
+            
         }
     }
 }

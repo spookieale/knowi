@@ -18,8 +18,8 @@ struct knowiApp: App {
                 Group {
                     // Check if user has completed onboarding
                     if UserDefaults.standard.data(forKey: "userProfile") != nil {
-                        // User has profile, show HomeView
-                        HomeView()
+                        // User has profile, show TabView
+                        MainTabView()
                     } else {
                         // User needs onboarding
                         LandingView()

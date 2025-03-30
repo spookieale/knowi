@@ -2,8 +2,26 @@ import SwiftUI
 import AVFoundation
 import AudioToolbox
 
-// MARK: - Music Programming View
-struct MusicProgrammingView: View {
+// MARK: - Music Programming View with Learning Style Tracking
+struct MusicProgrammingView: View, LearningStyleAware {
+    // Required by LearningStyleAware protocol
+    var quest: Quest {
+        // Find the existing quest or create a new one
+        return UserDataManager.shared.availableQuests.first(where: { $0.title == "Música y Programación" }) ??
+            Quest(
+                title: "Música y Programación",
+                description: "Aprende conceptos de programación a través de patrones musicales",
+                xpReward: 150,
+                duration: 25,
+                difficulty: .intermediate,
+                learningStyles: ["auditory"],
+                iconName: "music.note",
+                isCompleted: false,
+                completionPercentage: 0.0,
+                destination: nil
+            )
+    }
+    
     // Environment objects for navigation
     @Environment(\.presentationMode) var presentationMode
     
@@ -104,6 +122,8 @@ struct MusicProgrammingView: View {
                         // Play example button
                         Button(action: {
                             playExampleSequence()
+                            // Track this interaction for learning style
+                            recordInteraction(type: "example_played")
                         }) {
                             HStack {
                                 Image(systemName: "play.fill")
@@ -159,6 +179,8 @@ struct MusicProgrammingView: View {
                         ForEach(MusicalNote.allCases, id: \.self) { note in
                             Button(action: {
                                 addNoteToSequence(note)
+                                // Track note selection for learning style
+                                recordInteraction(type: "note_selected", value: note.midiNote)
                             }) {
                                 ZStack {
                                     Circle()
@@ -181,6 +203,8 @@ struct MusicProgrammingView: View {
                         // Reset button
                         Button(action: {
                             resetSequence()
+                            // Track reset for learning style
+                            recordInteraction(type: "sequence_reset")
                         }) {
                             HStack {
                                 Image(systemName: "arrow.counterclockwise")
@@ -197,6 +221,8 @@ struct MusicProgrammingView: View {
                         // Play button
                         Button(action: {
                             playUserSequence()
+                            // Track playback for learning style
+                            recordInteraction(type: "sequence_played")
                         }) {
                             HStack {
                                 Image(systemName: "play.fill")
@@ -236,6 +262,10 @@ struct MusicProgrammingView: View {
                     Button(action: {
                         withAnimation {
                             showHint.toggle()
+                            // Track hint usage for learning style
+                            if !showHint {
+                                recordInteraction(type: "hint")
+                            }
                         }
                     }) {
                         Text(showHint ? "Ocultar pista" : "Mostrar pista")
@@ -290,9 +320,23 @@ struct MusicProgrammingView: View {
         .onAppear {
             hapticFeedback.prepare()
             audioController.prepareAudioEngine()
+            
+            // Start ML tracking when view appears
+            startTracking()
         }
         .onDisappear {
             audioController.stopAudioEngine()
+            
+            // If completed, record completion data for ML analysis
+            if isCompleted {
+                // Calculate final score based on XP earned
+                let totalPossibleXP = 100 * lessons.count
+                let earnedXP = xpEarned * lessons.count
+                let score = Double(earnedXP) / Double(totalPossibleXP) * 100.0
+                
+                // Get elapsed time from start tracking
+                completeTracking(manualScore: score)
+            }
         }
     }
     
@@ -355,6 +399,9 @@ struct MusicProgrammingView: View {
             // Calculate XP based on attempts
             xpEarned = max(100 - (attemptCount * 20), 50)
             
+            // Track correct answer for learning style analysis
+            recordInteraction(type: "correct")
+            
             // Success feedback
             hapticFeedback.notificationOccurred(.success)
             
@@ -366,6 +413,9 @@ struct MusicProgrammingView: View {
                 showSuccess = true
             }
         } else {
+            // Track incorrect answer for learning style analysis
+            recordInteraction(type: "incorrect")
+            
             // Incorrect feedback
             hapticFeedback.notificationOccurred(.error)
             
